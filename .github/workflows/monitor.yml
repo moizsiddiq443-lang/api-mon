@@ -1,0 +1,36 @@
+name: monitor
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: 'force phase'
+        required: false
+        default: ''
+permissions:
+  contents: write
+concurrency:
+  group: mon
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node run.mjs
+        env:
+          KEY: ${{ secrets.ENC_KEY }}
+          PHASE: ${{ github.event.inputs.phase }}
+      - name: snapshot
+        if: success()
+        run: |
+          git config user.name "mon-bot"
+          git config user.email "mon-bot@users.noreply.github.com"
+          git add snapshots/
+          git diff --cached --quiet || git commit -m "run $(date -u +%Y%m%d)"
+          git push
