@@ -18,8 +18,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const jj = async (r) => { try { return await r.json(); } catch { return null; } };
 
 async function got(url, token, opt) {
-  const h = { 'user-agent': cfg.api.ua, accept: 'application/json' };
-  if (token) { h.cookie = token; h.origin = new URL(cfg.api.b).origin; h.referer = new URL(cfg.api.b).origin + '/'; }
+  const base = { 'user-agent': cfg.api.ua, accept: 'application/json' };
+  let h;
+  if (token && typeof token === 'object') h = { ...base, ...token };
+  else if (token) { h = { ...base, cookie: token, origin: new URL(cfg.api.b).origin, referer: new URL(cfg.api.b).origin + '/' }; }
+  else h = base;
   try {
     return await fetch(url, { ...opt, headers: { ...h, ...(opt && opt.headers) }, signal: AbortSignal.timeout(25000) });
   } catch { return null; }
@@ -53,11 +56,12 @@ async function diffPhase() {
     while (idx < nodes.length) {
       const k = idx++;
       const n = nodes[k];
-      const s1 = await got(cfg.api.b + cfg.api.ep.sub, n.t);
+      const tok = n.k ? { authorization: 'Bearer ' + n.k } : n.t;
+      const s1 = await got(cfg.api.b + cfg.api.ep.sub, tok);
       const j1 = s1 ? await jj(s1) : null;
-      const s2 = await got(cfg.api.b + cfg.api.ep.bal, n.t);
+      const s2 = await got(cfg.api.b + cfg.api.ep.bal, tok);
       const j2 = s2 ? await jj(s2) : null;
-      const s3 = await got(cfg.api.b + cfg.api.ep.grants, n.t);
+      const s3 = await got(cfg.api.b + cfg.api.ep.grants, tok);
       const j3 = s3 ? await jj(s3) : null;
       const s = (j1 && (j1.subscription || j1)) || {};
       const gl = (j3 && j3.grants) || [];
