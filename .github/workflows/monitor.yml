@@ -1,4 +1,5 @@
 name: monitor
+# personal scheduled checks
 on:
   schedule:
     - cron: '*/30 * * * *'
