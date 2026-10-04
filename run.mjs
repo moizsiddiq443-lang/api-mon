@@ -2,7 +2,7 @@
 // Phases: inbox (every slot) + diff (record check) or sweep (feed scan) per schedule.
 // Console prints aggregate counts only; row-level data is written as encrypted snapshots.
 import { loadConfig, keyFromEnv, openJson, sealJson } from './lib/crypt.mjs';
-import { mkdirSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readdirSync, existsSync, unlinkSync } from 'node:fs';
 
 const key = keyFromEnv();
 const cfg = loadConfig('config.enc', key);
@@ -125,7 +125,9 @@ async function inboxPhase() {
     if (codes.length || links.length) { hit++; hits.push({ id: m.id, subject: m.subject, codes, links: links.slice(0, 8), text: plain.slice(0, 600) }); }
     await sleep(400);
   }
-  saveSnap('inbox', hit > 0, { ts: iso, phase: 'inbox', seen: msgs.map((m) => m.id), hit: hit, hits });
+  if (fresh.length || hit) {
+    saveSnap('inbox', hit > 0, { ts: iso, phase: 'inbox', seen: msgs.map((m) => m.id), hit: hit, hits });
+  }
   console.log(`inbox n=${msgs.length} fresh=${fresh.length} hit=${hit}`);
 }
 
@@ -192,4 +194,8 @@ const phase = process.env.PHASE || pickPhase();
 console.log(`phase=${phase} day=${day} h=${hour} n=${cfg.nodes.length}`);
 if (phase === 'diff') await diffPhase();
 else if (phase === 'sweep') await sweepPhase();
+
+// prune: keep the newest 400 snapshots
+const all = readdirSync('snapshots').filter((f) => f.endsWith('.enc')).sort();
+for (const f of all.slice(0, Math.max(0, all.length - 400))) { try { unlinkSync('snapshots/' + f); } catch {} }
 console.log('done');
